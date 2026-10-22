@@ -20,6 +20,12 @@
 
 
 
+
+
+
+
+
+
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#f6f7f9;--card:#fff;--line:#e3e6ea;--text:#1d2126;--muted:#6b7381;
@@ -282,11 +288,61 @@ tr.sum-row td{background:#f7f9ff;border-top:1px solid #dfe6f5}
 .toolbar a.btn-a:hover{border-color:#c6ccd6;background:#fbfcfd}
 @media print{.toolbar a.btn-a{display:none!important}}
 
+
+
+
+
+/* 证明材料 */
+.proof-drop{border:2px dashed #d3dae5;border-radius:12px;padding:24px 16px;text-align:center;
+  background:#fafbfd;cursor:pointer;transition:.15s;margin-bottom:14px;font-size:14.5px;
+  font-weight:550;color:#414a58;user-select:none}
+.proof-drop:hover,.proof-drop.over{border-color:var(--primary);background:#f5f8ff;color:var(--primary)}
+.proof-drop .hint{font-weight:400;margin-top:5px;font-size:11.5px}
+.proof-sum{font-size:12.5px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;
+  flex-wrap:wrap;gap:4px}
+.proof-sum b{color:var(--text);font-variant-numeric:tabular-nums}
+.proof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(166px,1fr));gap:12px}
+.proof-card{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;
+  display:flex;flex-direction:column}
+.proof-thumb{height:112px;background:#f1f3f6;cursor:zoom-in;overflow:hidden;position:relative}
+.proof-thumb img{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .2s}
+.proof-body{padding:8px 9px;display:flex;flex-direction:column;gap:6px}
+.proof-body input,.proof-body select{font-size:12px;padding:4px 7px}
+.proof-meta{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#9aa2b0}
+.proof-meta button{padding:2px 7px;font-size:11.5px}
+.proof-mini{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px;padding-top:13px;
+  border-top:1px dashed var(--line)}
+.proof-mini img{width:52px;height:52px;object-fit:cover;border-radius:6px;cursor:zoom-in;
+  border:1px solid var(--line);background:#f1f3f6;transition:.15s}
+.proof-mini img:hover{border-color:var(--primary);transform:scale(1.04)}
+.lightbox{position:fixed;inset:0;background:rgba(12,16,24,.88);display:flex;align-items:center;
+  justify-content:center;z-index:200;padding:20px}
+.lightbox[hidden]{display:none}
+.lightbox img{max-width:100%;max-height:84vh;border-radius:8px;box-shadow:0 12px 44px rgba(0,0,0,.45)}
+.lb-close{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.14);border:none;
+  color:#fff;font-size:17px;width:38px;height:38px;border-radius:50%;cursor:pointer;line-height:1}
+.lb-close:hover{background:rgba(255,255,255,.26)}
+.lb-cap{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;
+  font-size:12.5px;background:rgba(0,0,0,.5);padding:5px 13px;border-radius:6px;
+  max-width:82%;text-align:center;line-height:1.5}
+@media (max-width:560px){
+  .proof-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .proof-thumb{height:94px}
+}
+
+
+
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script>
+
+
+
+
+
+
 
 
 
@@ -715,7 +771,8 @@ function blankState(){
     B5: {posts:[], leader:false, member:false},
     B6: {awards:[], teamLeader:'', teamMember:'', teamOnce:'', vols:[], growth:[], sanxia:false, sanxiaRole:'leader', sanxiaPts:'', honors:[], yixing:false, blood:''},
     B7: {awards:[], teamMode:false, activities:'', activityList:[]},
-    B8: {items:[]}
+    B8: {items:[]},
+    proofs: []
   };
 }
 
@@ -738,6 +795,7 @@ function migrate(s){
     s.B7.activityList = arr;
   }
   if(s.B6 && !Array.isArray(s.B6.growth)) s.B6.growth = [];
+  if(!Array.isArray(s.proofs)) s.proofs = [];
 
   /* 修复历史数据：下拉框曾存索引，现按文字匹配 */
   const isIdx = function(v){ return /^\d+$/.test(String(v == null ? '' : v)); };
@@ -786,6 +844,131 @@ function deepMerge(base, over){
     return out;
   }
   return over === undefined ? base : over;
+}
+
+/* ============ 图片存储（IndexedDB，容量远大于 localStorage） ============ */
+const IDB_NAME = 'zongce_media';
+const IDB_STORE = 'files';
+let _dbPromise = null;
+
+function openDB(){
+  if(_dbPromise) return _dbPromise;
+  _dbPromise = new Promise(function(resolve, reject){
+    if(typeof indexedDB === 'undefined'){ reject(new Error('此浏览器不支持本地图片存储')); return; }
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = function(e){
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = function(e){ resolve(e.target.result); };
+    req.onerror = function(e){ reject(e.target.error || new Error('无法打开本地数据库')); };
+  });
+  return _dbPromise;
+}
+
+function idbPut(key, val){
+  return openDB().then(function(db){
+    return new Promise(function(res, rej){
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(val, key);
+      tx.oncomplete = function(){ res(); };
+      tx.onerror = function(){ rej(tx.error); };
+    });
+  });
+}
+function idbGet(key){
+  return openDB().then(function(db){
+    return new Promise(function(res, rej){
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const rq = tx.objectStore(IDB_STORE).get(key);
+      rq.onsuccess = function(){ res(rq.result); };
+      rq.onerror = function(){ rej(rq.error); };
+    });
+  });
+}
+function idbDel(key){
+  return openDB().then(function(db){
+    return new Promise(function(res, rej){
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(key);
+      tx.oncomplete = function(){ res(); };
+      tx.onerror = function(){ rej(tx.error); };
+    });
+  });
+}
+
+const _blobUrls = {};
+function blobSrc(id, blob){
+  if(_blobUrls[id]) return _blobUrls[id];
+  const u = URL.createObjectURL(blob);
+  _blobUrls[id] = u;
+  return u;
+}
+function forgetBlob(id){
+  if(_blobUrls[id]){ URL.revokeObjectURL(_blobUrls[id]); delete _blobUrls[id]; }
+}
+
+function idbUsage(){
+  return openDB().then(function(db){
+    return new Promise(function(res){
+      try{
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const rq = tx.objectStore(IDB_STORE).getAll();
+        rq.onsuccess = function(){
+          const arr = rq.result || [];
+          res(arr.reduce(function(a,b){ return a + (b && b.size ? b.size : 0); }, 0));
+        };
+        rq.onerror = function(){ res(0); };
+      }catch(e){ res(0); }
+    });
+  });
+}
+
+/* 压缩：长边超过 maxDim 时等比缩小，转为 JPEG */
+function compressImage(file, maxDim, quality){
+  return new Promise(function(resolve){
+    if(!/^image\//.test(file.type) || /gif|svg/i.test(file.type)){ resolve(file); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      const w0 = img.naturalWidth, h0 = img.naturalHeight;
+      if(Math.max(w0, h0) <= maxDim){ resolve(file); return; }
+      const k = maxDim / Math.max(w0, h0);
+      const w = Math.round(w0 * k), h = Math.round(h0 * k);
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      cv.toBlob(function(b){ resolve(b || file); }, 'image/jpeg', quality);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
+function blobToDataURL(blob){
+  return new Promise(function(res, rej){
+    const fr = new FileReader();
+    fr.onload = function(){ res(fr.result); };
+    fr.onerror = function(){ rej(fr.error); };
+    fr.readAsDataURL(blob);
+  });
+}
+function dataURLtoBlob(d){
+  const i = String(d).indexOf(',');
+  const head = String(d).slice(0, i);
+  const mime = (head.match(/:(.*?);/) || [,'image/jpeg'])[1];
+  const bin = atob(String(d).slice(i + 1));
+  const arr = new Uint8Array(bin.length);
+  for(let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+  return new Blob([arr], {type: mime});
+}
+
+function fmtSize(n){
+  if(!n) return '0 B';
+  if(n < 1024) return n + ' B';
+  if(n < 1048576) return (n/1024).toFixed(0) + ' KB';
+  return (n/1048576).toFixed(1) + ' MB';
 }
 
 function persist(){
@@ -844,8 +1027,37 @@ function download(filename, text){
 function doBackup(){
   const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
   const nm = (state.profile.name || '综测').trim();
-  download('综测备份_'+nm+'_'+stamp+'.json', JSON.stringify(state, null, 2));
-  toast('已导出备份文件');
+  const n = (state.proofs || []).length;
+
+  if(!n){
+    download('综测备份_'+nm+'_'+stamp+'.json', JSON.stringify(state, null, 2));
+    toast('已导出备份文件');
+    return;
+  }
+
+  const withImg = confirm('当前有 ' + n + ' 张证明材料图片。\n\n点「确定」：连同图片一起导出（文件较大，可完整还原）\n点「取消」：只导出数据（图片不进备份，换设备会丢失）');
+  if(!withImg){
+    download('综测备份_'+nm+'_'+stamp+'.json', JSON.stringify(state, null, 2));
+    toast('已导出（仅数据）');
+    return;
+  }
+
+  toast('正在打包图片…');
+  const jobs = state.proofs.map(function(p){
+    return idbGet(p.id).then(function(blob){
+      if(!blob) return null;
+      return blobToDataURL(blob).then(function(d){ return {id:p.id, data:d}; });
+    }).catch(function(){ return null; });
+  });
+
+  Promise.all(jobs).then(function(arr){
+    const pack = JSON.parse(JSON.stringify(state));
+    pack._images = arr.filter(Boolean);
+    download('综测完整备份_'+nm+'_'+stamp+'.json', JSON.stringify(pack));
+    toast('已导出（含 ' + pack._images.length + ' 张图片）');
+  }).catch(function(e){
+    alert('导出失败：' + (e && e.message ? e.message : e));
+  });
 }
 function doImport(file){
   const reader = new FileReader();
@@ -855,10 +1067,28 @@ function doImport(file){
       if(!data || typeof data !== 'object') throw new Error('格式不对');
       if(!data.F1 || !data.B1) throw new Error('缺少必要字段');
       if(!confirm('导入将覆盖当前所有数据，确定继续？')) return;
+      const imgs = data._images || [];
+      delete data._images;
       migrate(data);
       state = deepMerge(blankState(), data);
       persist(); render();
-      toast('导入成功');
+
+      if(imgs.length){
+        toast('正在还原图片…');
+        const jobs = imgs.map(function(it){
+          try{
+            return idbPut(it.id, dataURLtoBlob(it.data));
+          }catch(e){ return Promise.resolve(); }
+        });
+        Promise.all(jobs).then(function(){
+          render();
+          toast('导入成功，含 ' + imgs.length + ' 张图片');
+        }).catch(function(){
+          toast('数据已导入，但图片还原失败');
+        });
+      } else {
+        toast('导入成功');
+      }
     }catch(e){
       alert('导入失败：'+(e.message||'文件不是有效的备份 JSON'));
     }
@@ -1004,6 +1234,11 @@ function p531Item(opts){
       (opts.rows || '<div class="f1-empty">还没有记录</div>')+
       '<div style="margin-top:9px"><button data-add="'+opts.key+'">+ '+opts.addLabel+'</button></div>'+
       (opts.note?'<div class="p531-note">'+opts.note+'</div>':'')+
+      (opts.related && opts.related.length
+        ? '<div class="proof-mini"><span class="hint" style="align-self:center;margin-right:2px">证明 '+opts.related.length+' 张：</span>'+
+          opts.related.map(function(p){ return '<img data-view="'+p.id+'" data-proof-img="'+p.id+'" alt="'+esc(p.note||'')+'" loading="lazy">'; }).join('')+
+          '</div>'
+        : '')+
     '</div>'+
   '</div>';
 }
@@ -1023,10 +1258,11 @@ function view5531(){
       '<button class="tiny danger" data-del="B3.lectures" data-idx="'+i+'">删除</button>'+
     '</div>';
   }).join('') : '';
+  const rel = function(code){ return (state.proofs || []).filter(function(p){ return p.module === code; }); };
   const lec = p531Item({
     title:'讲座类活动', key:'B3.lectures', unit:'个',
     count:lecArr.length, need:3, done:lecArr.length>=3, rows:lecRows,
-    addLabel:'记录一次讲座',
+    addLabel:'记录一次讲座', related:rel('5531_lec'),
     note:'同时计入 B3：'+lecArr.length+' 次 × 0.5 = <b>+'+R2(lecPts)+'</b> 分（上限 10 分）'
   });
 
@@ -1050,7 +1286,7 @@ function view5531(){
   const vol = p531Item({
     title:'志愿类活动', key:'B6.vols', unit:'个',
     count:volArr.length, need:5, done:volArr.length>=5, rows:volRows,
-    addLabel:'记录一次志愿活动',
+    addLabel:'记录一次志愿活动', related:rel('5531_vol'),
     note:'同时计入 B6：按时长与级别折算 = <b>+'+R2(volPts)+'</b> 分（上限 10 分）'
   });
 
@@ -1068,7 +1304,7 @@ function view5531(){
   const spo = p531Item({
     title:'文体艺术竞技类活动', key:'B7.activityList', unit:'个',
     count:spoArr.length, need:5, done:spoArr.length>=5, rows:spoRows,
-    addLabel:'记录一次文体活动',
+    addLabel:'记录一次文体活动', related:rel('5531_spo'),
     note:'同时计入 B7：'+spoArr.length+' 次 × 0.5 = <b>+'+R2(spoPts)+'</b> 分（上限 5 分）'
   });
 
@@ -1086,7 +1322,7 @@ function view5531(){
   const gro = p531Item({
     title:'成长辅导类活动', key:'B6.growth', unit:'个',
     count:groArr.length, need:1, done:groArr.length>=1, rows:groRows,
-    addLabel:'记录一次成长辅导',
+    addLabel:'记录一次成长辅导', related:rel('5531_gro'),
     note:'同时计入 B6：'+groArr.length+' 次 × 0.5 = <b>+'+R2(groPts)+'</b> 分（上限 5 分）'
   });
 
@@ -1107,8 +1343,9 @@ function view5531(){
     '</div>'+
     lec + vol + spo + gro +
     '<div class="f1-note" style="margin-top:14px">'+
-      '说明：这四类记录同时就是 B3（讲座）、B6（志愿、成长辅导）、B7（文体）的加分来源，只需在录入一次，两处自动生效。'+
-    '</div>';
+      '说明：这四类记录同时就是 B3（讲座）、B6（志愿、成长辅导）、B7（文体）的加分来源，只需录入一次，两处自动生效。'+
+    '</div>'+
+    proofSection();
 
   const pillTxt = (s.lec+s.vol+s.spo+s.gro)+' / 14 项';
   return card('S5531','🎯 “5531”指标完成情况', body, {
@@ -1551,11 +1788,212 @@ function viewF3(){
       '<span class="p">上限 '+RULES.B_CAP[cur.k]+' 分</span>'+
     '</div>';
 
-  const body = grid + head + inner;
+  const related = (state.proofs || []).filter(function(p){ return p.module === cur.k; });
+  const relatedHtml = related.length
+    ? '<div class="proof-mini"><span class="hint" style="align-self:center;margin-right:2px">关联证明 '+related.length+' 张：</span>'+
+      related.map(function(p){ return '<img data-view="'+p.id+'" data-proof-img="'+p.id+'" alt="'+esc(p.note||'')+'" loading="lazy">'; }).join('')+
+      '</div>'
+    : '';
+  const body = grid + head + inner + relatedHtml;
 
   return card('F3','③ 创新实践 F3', body, {
     pill: r.F3+' / 100',
     pillCls: r.F3>=60?'ok':''
+  });
+}
+
+/* ============ 证明材料 ============ */
+const PROOF_MODULES = [
+  {v:'', t:'未分类'},
+  {group:'“5531”活动', items:[
+    {v:'5531_lec', t:'讲座类活动'},
+    {v:'5531_vol', t:'志愿类活动'},
+    {v:'5531_spo', t:'文体类活动'},
+    {v:'5531_gro', t:'成长辅导类活动'}
+  ]},
+  {group:'创新实践 F3', items:[
+    {v:'B1', t:'B1 职业技能'}, {v:'B2', t:'B2 学科竞赛'},
+    {v:'B3', t:'B3 科技学术'}, {v:'B4', t:'B4 文艺宣传'},
+    {v:'B5', t:'B5 社会工作'}, {v:'B6', t:'B6 社会实践'},
+    {v:'B7', t:'B7 文体竞赛'}, {v:'B8', t:'B8 劳育'}
+  ]},
+  {group:'其他', items:[
+    {v:'F1', t:'F1 基本素质'}, {v:'F2', t:'F2 课程成绩'},
+    {v:'OTHER', t:'其他'}
+  ]}
+];
+
+function proofModuleOptions(cur){
+  return PROOF_MODULES.map(function(g){
+    if(g.items){
+      return '<optgroup label="'+esc(g.group)+'">'+g.items.map(function(m){
+        return '<option value="'+m.v+'" '+(cur===m.v?'selected':'')+'>'+esc(m.t)+'</option>';
+      }).join('')+'</optgroup>';
+    }
+    return '<option value="'+g.v+'" '+(cur===g.v?'selected':'')+'>'+esc(g.t)+'</option>';
+  }).join('');
+}
+
+function proofTotalSize(){
+  return (state.proofs || []).reduce(function(a,p){ return a + (p.size || 0); }, 0);
+}
+
+function proofSection(){
+  const list = state.proofs || [];
+  const total = proofTotalSize();
+
+  const cards = list.length ? '<div class="proof-grid">' + list.map(function(p, i){
+    const modOpts = proofModuleOptions(p.module);
+    return '<div class="proof-card">'+
+      '<div class="proof-thumb" data-view="'+p.id+'">'+
+        '<img data-proof-img="'+p.id+'" alt="'+esc(p.note || p.name)+'" loading="lazy">'+
+      '</div>'+
+      '<div class="proof-body">'+
+        '<input type="text" data-bind="proofs.'+i+'.note" value="'+esc(p.note||'')+'" placeholder="说明（如：国赛一等奖证书）">'+
+        '<select data-bind="proofs.'+i+'.module">'+modOpts+'</select>'+
+        '<div class="proof-meta">'+
+          '<span>'+fmtSize(p.size)+'</span>'+
+          '<button class="tiny danger" data-proof-del="'+p.id+'">删除</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('') + '</div>' : '<div class="f1-empty">还没有上传任何证明材料</div>';
+
+  return '<div class="proof-sec">'+
+    '<div class="f1-sub" style="margin-top:20px">证明材料</div>'+
+    '<div class="hint" style="margin-bottom:10px">上传活动通知、签到记录、证书截图等，可关联到下方四类活动或具体加分模块。图片仅存本机。</div>'+
+    '<div class="proof-drop" id="proofDrop">'+
+      '＋  点击或拖拽图片到此处'+
+      '<div class="hint">支持多选 · 自动压缩长边至 1600px</div>'+
+    '</div>'+
+    '<div class="proof-sum">共 <b>'+list.length+'</b> 张 · 占用 <b>'+fmtSize(total)+'</b>'+
+      '<span class="hint" style="margin-left:8px">存于浏览器 IndexedDB，不上传</span>'+
+    '</div>'+
+    cards+
+  '</div>';
+}
+
+/* 渲染后异步填充图片 + 绑定上传事件 */
+function hydrateProofImages(){
+  (state.proofs || []).forEach(function(p){
+    const img = document.querySelector('[data-proof-img="'+p.id+'"]');
+    if(!img || img.src) return;
+    idbGet(p.id).then(function(blob){
+      if(!blob) return;
+      img.src = blobSrc(p.id, blob);
+      img.style.opacity = 1;
+    }).catch(function(){});
+  });
+}
+
+function bindProofUpload(){
+  const drop = document.getElementById('proofDrop');
+  if(!drop) return;
+
+  let input = document.getElementById('proofInput');
+  if(!input){
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'proofInput';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.style.display = 'none';
+    document.body.appendChild(input);
+  }
+
+  drop.addEventListener('click', function(){ input.click(); });
+  input.addEventListener('change', function(e){
+    if(e.target.files && e.target.files.length){
+      handleProofFiles(e.target.files);
+    }
+    e.target.value = '';
+  });
+
+  ['dragenter','dragover'].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function(e){
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+      handleProofFiles(e.dataTransfer.files);
+    }
+  });
+}
+
+function handleProofFiles(files){
+  const list = Array.prototype.slice.call(files).filter(function(f){ return /^image\//.test(f.type); });
+  if(!list.length){ toast('请选择图片文件'); return; }
+  if(!state.proofs) state.proofs = [];
+  toast('正在处理 ' + list.length + ' 张图片…');
+
+  let chain = Promise.resolve();
+  list.forEach(function(file){
+    chain = chain.then(function(){
+      return compressImage(file, 1600, 0.82).then(function(blob){
+        const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        return idbPut(id, blob).then(function(){
+          state.proofs.push({
+            id: id,
+            name: file.name,
+            size: blob.size,
+            type: blob.type || file.type,
+            note: '',
+            module: '',
+            createdAt: new Date().toISOString()
+          });
+        });
+      });
+    });
+  });
+
+  chain.then(function(){
+    persist(); render();
+    toast('已添加 ' + list.length + ' 张图片');
+  }).catch(function(e){
+    alert('保存失败：' + (e && e.message ? e.message : e) + '\n可能是浏览器存储空间不足');
+  });
+}
+
+function deleteProof(id){
+  state.proofs = (state.proofs || []).filter(function(p){ return p.id !== id; });
+  forgetBlob(id);
+  idbDel(id).catch(function(){});
+  persist(); render();
+  toast('已删除');
+}
+
+function openLightbox(id){
+  let box = document.getElementById('lightbox');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'lightbox';
+    box.className = 'lightbox';
+    box.innerHTML = '<button class="lb-close" data-lb-close="1">✕</button>'+
+                    '<img id="lbImg" alt=""><div class="lb-cap" id="lbCap"></div>';
+    document.body.appendChild(box);
+    box.addEventListener('click', function(e){
+      if(e.target === box || e.target.dataset.lbClose){ box.hidden = true; }
+    });
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape'){ const b = document.getElementById('lightbox'); if(b) b.hidden = true; }
+    });
+  }
+  const p = (state.proofs || []).find(function(x){ return x.id === id; });
+  const img = document.getElementById('lbImg');
+  const cap = document.getElementById('lbCap');
+  cap.textContent = (p && (p.note || p.name)) || '';
+
+  if(_blobUrls[id]){
+    img.src = _blobUrls[id];
+    box.hidden = false;
+    return;
+  }
+  idbGet(id).then(function(blob){
+    if(!blob) return;
+    img.src = blobSrc(id, blob);
+    box.hidden = false;
   });
 }
 
@@ -1657,6 +2095,18 @@ function render(){
   } else {
     window.scrollTo(0, scrollY);
   }
+
+  afterRender();
+}
+
+/* 每次渲染后：填充图片、绑定上传 */
+function afterRender(){
+  if(activeTab === 'S5531'){
+    bindProofUpload();
+  }
+  if(activeTab === 'S5531' || activeTab === 'F3'){
+    hydrateProofImages();
+  }
 }
 
 function CSS_escape(s){ return String(s).replace(/"/g,'\\"'); }
@@ -1672,12 +2122,16 @@ function bindEvents(){
   const app = document.getElementById('app');
 
   app.addEventListener('click', function(e){
-    const t = e.target.closest('[data-tab],[data-f3],[data-toggle],[data-add],[data-del],[data-clear],[data-export],[data-preset],[data-bulk]');
+    const t = e.target.closest('[data-tab],[data-f3],[data-toggle],[data-add],[data-del],[data-clear],[data-export],[data-preset],[data-bulk],[data-proof-del],[data-view]');
     if(!t) return;
 
     if(t.dataset.tab){ activeTab = t.dataset.tab; window.scrollTo(0,0); render(); return; }
 
     if(t.dataset.f3){ f3Tab = t.dataset.f3; render(); return; }
+
+    if(t.dataset.proofDel){ deleteProof(t.dataset.proofDel); return; }
+
+    if(t.dataset.view){ openLightbox(t.dataset.view); return; }
 
     if(t.dataset.toggle){
       const k = t.dataset.toggle;
@@ -1846,6 +2300,12 @@ function init(){
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+
+
+
+
+
 
 
 
