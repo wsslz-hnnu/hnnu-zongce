@@ -11,7 +11,7 @@
 > **本项目是学生个人自制的辅助工具，不是学校官方系统，与湖南师范大学及医学部无隶属关系。**
 > 计分结果仅供参考，**最终成绩以医学部综测小组的正式核定为准**。使用前请务必阅读 [免责声明](#免责声明)。
 
-**在线使用**：[(https://wsslz-hnnu.github.io/hnnu-zongce/)`（部署后替换成你的地址）
+**在线使用**：(部署后替换成你的地址)https://wsslz-hnnu.github.io/hnnu-zongce/
 
 ---
 
@@ -80,7 +80,7 @@
 部署完成后直接访问：
 
 ```
-https://<你的用户名>.github.io/<仓库名>/
+https://wsslz-hnnu.github.io/hnnu-zongce/
 ```
 
 手机打开后可「添加到主屏幕」，用起来接近 App。
@@ -97,7 +97,7 @@ https://<你的用户名>.github.io/<仓库名>/
 
 ## 部署到 GitHub Pages
 
-1. **新建仓库**：New repository → 名称随意（如 `zongce`）→ 可见性选 **Public** → 创建
+1. **新建仓库**：New repository → 名称随意（如 `zongce`）→ 可见性选 **公开** → 创建
 2. **上传文件**：Add file → Upload files，把 `index.html`、`rules.docx`、`README.md` 拖进去 → Commit
 3. **开启 Pages**：仓库 Settings → 左侧 Pages → Source 选 `Deploy from a branch` → Branch 选 `main` + `/ (root)` → Save
 4. **等待生效**：约 1~2 分钟后刷新，页面顶部会出现站点地址；之后每次改动文件会自动重新部署
