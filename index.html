@@ -137,12 +137,67 @@ footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:28px;lin
   .tiny{min-height:32px;padding:5px 10px}
   .row-item .del,.lec-row button{min-height:32px}
 }
+/* ---------- 打印：A4 单页尽量压缩 ---------- */
+@page{ size:A4 portrait; margin:10mm; }
 @media print{
-  body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .toolbar,.tabs,button,footer,#lightbox,.toast{display:none!important}
-  .card{break-inside:avoid;border-color:#ccc}
+  html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{
+    font-size:11.5px;line-height:1.35;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  .wrap{max-width:none;margin:0;padding:0}
+
+  /* 隐藏交互元素、提示与缩略条 */
+  .toolbar,.tabs,button,footer,#lightbox,.toast,
+  .print-hide,.proof-mini,details{display:none!important}
   .collapsed .card-b{display:block!important}
   .table-wrap{overflow:visible!important}
+
+  header{margin:0 0 5px}
+  h1{font-size:15px;letter-spacing:0}
+  .sub{font-size:9px;margin-top:1px}
+
+  /* 汇总条：五格并排、压缩高度 */
+  .summary{margin:0 0 5px;grid-template-columns:repeat(5,1fr);border-radius:6px}
+  .sum-cell{padding:4px 7px}
+  .sum-cell .k{font-size:9px;margin:0}
+  .sum-cell .v{font-size:15px;letter-spacing:0;line-height:1.25}
+  .sum-cell .w{font-size:8.5px;margin:0;line-height:1.25}
+  /* 黑白打印也要看得清：浅底深字 + 左侧色条 */
+  .sum-cell.total{background:#eef2fb!important;color:#1d2126!important;
+    box-shadow:inset 2px 0 0 #2f6bff!important;border-radius:0}
+  .sum-cell.total .k,.sum-cell.total .w{color:#5a6577!important}
+
+  .card{margin:0 0 5px;border-color:#d7dbe2;border-radius:6px;break-inside:auto;overflow:visible!important}
+  .card-h{padding:4px 8px;background:#f8f9fb!important}
+  .card-h h2{font-size:11.5px;gap:5px}
+  .card-h .meta{font-size:9px}
+  .pill{font-size:8.5px;padding:0 5px}
+
+  .card-b{padding:7px 9px}
+  .sub-head{font-size:10px;margin:5px 0 2px}
+  table{font-size:10.5px}
+  th,td{padding:3px 5px}
+  th{background:#f8f9fb!important}
+  tr,li{break-inside:avoid}
+
+  .alert{font-size:9.5px;padding:4px 7px;margin-top:3px;gap:4px;line-height:1.35}
+  .p531-brief{font-size:9.5px;padding:4px 7px;gap:6px;margin:5px 0}
+  .hint{font-size:9px;margin-top:2px}
+  .f1-note{font-size:9px;margin-top:4px}
+
+  /* F1 / F3 内部块也压缩，避免多页 */
+  .f1-block{margin-bottom:5px}
+  .f1-block-h{padding:4px 8px}
+  .f1-block-b{padding:5px 8px 6px}
+  .f1-desc{font-size:9px;margin-bottom:4px}
+  .f1-line{margin-bottom:3px}
+  .f3-grid{gap:4px;margin-bottom:6px}
+  .f3-card{padding:4px 6px}
+  .f3-card .s{font-size:13px;margin:0 0 3px}
+  .lec-head{padding:4px 8px;margin-bottom:5px;gap:12px}
+  .proof-grid{grid-template-columns:repeat(4,1fr);gap:5px}
+  .proof-thumb{height:66px}
 }
 
 code{background:#f1f3f5;padding:1px 5px;border-radius:4px;font-size:12px;
@@ -781,7 +836,7 @@ const ENGINE = {
 /* ============ 状态与存储 ============ */
 const STORE_KEY = 'hunnu_med_zongce_v1';
 /* 版本号沿用原有命名规则：YYYYMMDD-简短说明（改动本文件时同步更新，并另存同名目录） */
-const APP_VERSION = '20261022-绩点版';
+const APP_VERSION = '20261022-打印优化';
 
 /* 本学期课程清单（据培养计划核对；标注 check 的三门学分待教务系统确认） */
 const PRESET_COURSES = [
@@ -2174,7 +2229,8 @@ function viewResult(){
       '<button data-print="1">打印 / 存为 PDF</button>'+
       '<button data-export="csv">导出明细 CSV</button>'+
     '</div>'+
-    '<div class="hint" style="margin-top:10px">提示：打印时自动展开所有折叠内容（仅当前标签页）。导出 CSV 可用 Excel 打开核对各分项。<br>版本 '+APP_VERSION+'</div>';
+    '<div class="hint" style="margin-top:10px">版本 '+APP_VERSION+'</div>'+
+    '<div class="hint print-hide">提示：打印时自动展开所有折叠内容（仅当前标签页）。导出 CSV 可用 Excel 打开核对各分项。</div>';
 
   const pillCls = r.total>=80?'ok':r.total>=60?'warn':'bad';
   return card('result','📊 结果明细与计算过程', body, {pill:r.total.toFixed(2), pillCls:pillCls, meta:'<span class="pill gray">'+r.grade+'</span>'});
